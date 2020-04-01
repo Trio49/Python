@@ -1,1 +1,27 @@
-print( '\'hello,world\'\n\\"hello,world"')
+a = 'hello,world'
+b = 1.414
+c = (1 != 2)
+d = (True and False)
+e = (True or False)
+
+#python3.5
+#'第一题：普通输出'
+print(a, b, c, d, e)
+
+#'第二题：格式化输出'
+print('a:%s; b:%.2f; c:%s; d:%s; e:%s' % (a,b,c,d,e))
+
+#'第三题：转义符的使用'
+s = '\'hello,world\'\n\\"hello,world"'
+print(s)
+
+#python2.7
+#'第一题：普通输出'
+# print a,b,c,d,e
+#
+#'第二题：格式化输出'
+# print 'a:%s; b:%.2f; c:%s; d:%s; e:%s' % (a,b,c,d,e)
+#
+#'第三题：转义符的使用'
+# s = '\'hello,world\'\n\\"hello,world"'
+# print s
