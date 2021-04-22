@@ -1,0 +1,132 @@
+
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug  3 14:19:24 2020
+
+@author: tyin
+
+SMART ALLOCATION MODEL
+"""
+
+
+
+import numpy as np
+import pandas as pd
+#import jsonSMART
+#import pprint
+#import requests
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt 
+from os import listdir
+pd.set_option('mode.chained_assignment', None)
+
+
+#T:\Daily trades\Daily Re\SmartAllo
+
+raw_trades= pd.read_excel(r"T:\Daily trades\Daily Re\SmartAllo\SmartAllocation.xlsx",sheet_name="trades")
+raw_trades=raw_trades[raw_trades["Side"]=="SHORT"]
+raw_trades=raw_trades[raw_trades["CCY"].isin(["SGD","JPY","HKD","USD",'CAD'])]
+raw_trades=raw_trades[raw_trades["SynthType"]!="swp"]
+raw_trades["new_ticker_id"]= raw_trades["Code"].apply(lambda x:str(x))+raw_trades["CCY"]
+raw_trades=raw_trades[["Internal Account","BBG Code","new_ticker_id","TotalFilled","Notional 2"]]
+raw_trades=raw_trades[raw_trades["TotalFilled"]!=0]
+
+raw_trades=raw_trades.groupby(["Internal Account","BBG Code","new_ticker_id"])["TotalFilled","Notional 2"].sum()
+raw_trades.reset_index(inplace=True)
+
+
+
+borrows= pd.read_excel(r"T:\Daily trades\Daily Re\SmartAllo\SmartAllocation.xlsx",sheet_name="borrows")
+borrows['Code'].fillna(0,inplace=True)
+# borrows['Code']= borrows['Code'].astype(int)
+borrows['Code']= borrows['Code']
+borrows["new_ticker_id"] =  borrows["Code"].apply(lambda x:str(x))+borrows["CCY"]
+
+#only filter out cash trades mkt: SGD JPY HKD
+borrows=borrows[borrows["CCY"].isin(["SGD","JPY","HKD",'USD'])]
+borrows=borrows[["Internal Account","new_ticker_id","Broker","Filled","Rate (bps)"]]
+
+borrows=borrows.groupby(["Internal Account","new_ticker_id","Broker"]).agg({"Filled":np.sum,"Rate (bps)":np.mean})
+#6952JPY
+borrows.reset_index(inplace=True)
+
+GS_borrow =borrows[borrows["Broker"]=="gs"]
+MS_borrow =borrows[borrows["Broker"]=="msdw"]
+UBS_borrow =borrows[borrows["Broker"]=="ubs"]
+BAML_borrow =borrows[borrows["Broker"]=="baml"]
+JPM_borrow =borrows[borrows["Broker"]=="jpm"]
+NOMU_borrow =borrows[borrows["Broker"]=="nomu"]
+
+PBs={"GS":GS_borrow,"MS":MS_borrow,"UBS":UBS_borrow,"BAML":BAML_borrow,"JPM":JPM_borrow,"NOMU":NOMU_borrow}
+
+
+
+
+for pb in PBs:
+    #pb="GS"
+    raw_trades = raw_trades.merge(PBs[pb],left_on= ["Internal Account","new_ticker_id"],
+                    right_on=["Internal Account","new_ticker_id"],
+                    how="left")
+    raw_trades = raw_trades.drop(columns=["Broker"])
+    raw_trades.fillna(0,inplace=True)
+    raw_trades.rename(columns={"Filled":pb+" Qty","Rate (bps)":pb+" Rate bps"},inplace=True)
+
+
+
+
+raw_trades["isGC"]=True
+    
+for i in range(len(raw_trades)):
+    x1=(raw_trades.loc[i,"GS Rate bps"]<=50) & (raw_trades.loc[i,"GS Rate bps"]>0)
+    x2=(raw_trades.loc[i,"MS Rate bps"]<=50) & (raw_trades.loc[i,"MS Rate bps"]>0)
+    x3=(raw_trades.loc[i,"UBS Rate bps"]<=50) & (raw_trades.loc[i,"UBS Rate bps"]>0)
+    x4=(raw_trades.loc[i,"BAML Rate bps"]<=50) & (raw_trades.loc[i,"BAML Rate bps"]>0)
+    x5=(raw_trades.loc[i,"JPM Rate bps"]<=50) & (raw_trades.loc[i,"JPM Rate bps"]>0)
+    x6=(raw_trades.loc[i,"NOMU Rate bps"]<=50) & (raw_trades.loc[i,"NOMU Rate bps"]>0)
+    if (x1 & x2 & x3 & x4 & x5& x6):
+        raw_trades.loc[i,"isGC"]=True
+    else:
+        raw_trades.loc[i,"isGC"]=False
+        
+
+
+raw_trades_HTB=raw_trades[raw_trades["isGC"]==False]
+raw_trades_HTB["SmartAllo"]=""
+raw_trades_HTB["Cmmts"]=""
+
+
+
+raw_trades_HTB.reset_index(inplace=True)
+raw_trades_HTB.drop(columns=["index"],inplace=True)
+
+
+
+for i in range(len(raw_trades_HTB)):
+    #i=0
+    print(i)
+    optimal_allo={}
+    ss_qty=raw_trades_HTB.loc[i,"TotalFilled"]
+    for pb in PBs:
+        pb_coverqty= raw_trades_HTB.loc[i, pb+" Qty"]
+        if pb_coverqty>= ss_qty:
+            optimal_allo[pb]=raw_trades_HTB.loc[i,pb+" Rate bps"]
+    # optimal allo not empty
+    if bool(optimal_allo):
+        length = len(optimal_allo)
+        x= []
+        for ii in optimal_allo:
+            xi=(optimal_allo[ii]<50)
+            x.append(xi)
+        if (([True] * length) == x):
+            raw_trades_HTB.loc[i,"Cmmts"]="Liquid_Less_Important"
+            
+
+    minval = min(optimal_allo.values())
+    raw_trades_HTB.loc[i,"SmartAllo"]=str(dict((k,v) for k,v in optimal_allo.items() if v==minval))
+        
+    
+
+raw_trades_HTB_IMPORTANT= raw_trades_HTB[raw_trades_HTB["Cmmts"]!="Liquid_Less_Important"]
+#raw_trades_HTB_IMPORTANT= raw_trades_HTB_IMPORTANT[['Internal Account','BBG Code','TotalFilled','SmartAllo']]
+
+raw_trades_HTB_IMPORTANT.to_excel(r"T:\Daily trades\Daily Re\SmartAllo\Smart_Allo_Output.xlsx",index=False)
