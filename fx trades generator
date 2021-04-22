@@ -1,0 +1,58 @@
+import pandas as pd
+import numpy as np
+import datetime
+krw = r'T:\Daily trades\Daily Re\Python_Trade_Blotter\FX funding blotter\fundingkrw.xlsx'
+twd = r'T:\Daily trades\Daily Re\Python_Trade_Blotter\FX funding blotter\fundingtwd.xlsx'
+pbs = {'GSCO': "GS_PB", 'JPM': "JPM_FX", 'UBS': "UBS_FX",
+           'MLCO': "BAML_FX", 'MSCO': "MS_FX"}
+def read_excel(krw, currency, f_date):
+    dfk = pd.read_excel(krw, header=1)
+    dfk = dfk.iloc[1:-1,:]
+    dfk = dfk[dfk.columns[:-1]]
+    #print(dfk)
+    #dfk = dfk.unstack(['CustodianShortName', 'GSCO', 'MLCO', 'UBS'])
+    dfk = dfk.set_index('CustodianShortName')
+    dfk = dfk.stack()
+    dfk = dfk.reset_index()
+    
+    dfk['FORWARD DATE'] = date
+    if currency in ['KRW', 'krw']:
+        dfk['FORWARD DATE'] = date+delta
+    dfk['Currency'] = currency
+    
+    dfk['RATE'] = 0
+    dfk['USD Notional'] = np.NaN
+    dfk['LOCAL NOTIONAL'] = -dfk[0]
+    dfk['PM'] = dfk['CustodianShortName']
+    dfk = dfk[dfk[0] != 0]
+    dfk['PB'] = dfk['level_1'].apply(lambda x: pbs[x])
+    dfk['SPOT'] = 'TRUE'
+    dfk['Column2'] = 'USD'+dfk['Currency']
+    dfk = dfk[['SPOT','Column2', 'Currency','FORWARD DATE','PM',
+               'PB', 'RATE','USD Notional','LOCAL NOTIONAL']]
+    dfk_copy = dfk.copy()
+    dfk_copy['SPOT'] = 'FALSE'
+    dfk_copy['LOCAL NOTIONAL'] = -dfk_copy['LOCAL NOTIONAL']
+    dfk_copy['FORWARD DATE'] = datetime.date(int(fdate[:4]), int(fdate[4:6].lstrip('0')), int(fdate[-2:].lstrip('0')))
+    if currency in ['TWD', 'Twd']:
+        dfk_copy['FORWARD DATE'] = datetime.date(int(fdate2[:4]), int(fdate2[4:6].lstrip('0')), int(fdate2[-2:].lstrip('0')))
+    dfk = pd.concat([dfk, dfk_copy], axis=0)
+    #dfk = dfk.reset_index()
+    dfk = dfk.sort_index()
+    dfk['Column1'] ='POLY_'+ dfk['PM'] +'_' + dfk['PB']
+    return dfk
+
+#dfk.to_excel('fx.xlsx',index=False)
+fdate = input('please enter krw forward date(example:20210731):')
+fdate2 = input('please enter twd forward date(example:20210731):')
+
+#fdate = fdate[:4]+'/' + fdate[4:6] + '/' + fdate[-2:]
+td = pd.datetime.today()
+date = datetime.date(td.year, td.month, td.day)
+delta = pd.to_timedelta(1, unit='day')
+dfk = read_excel(krw, 'KRW', fdate)
+dft = read_excel(twd, 'TWD', fdate2)
+df = pd.concat([dfk, dft], axis=0)
+
+df.to_excel('T:\Daily trades\Daily Re\Python_Trade_Blotter\FX funding blotter/'+td.strftime('%Y%m%d')+'fx.xlsx',index=False)
+df.to_excel('T:\Daily trades\Daily Re\Python_Trade_Blotter\FX funding blotter\FX Uploader v2.xlsx',sheet_name='fundinginput',index=False)
