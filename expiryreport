@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Mar 10 10:03:33 2021
+
+@author: zzhang
+"""
+
+
+import pytz
+import pandas as pd
+import numpy as np
+import openpyxl
+#import matplotlib.pyplot as plt 
+from datetime import datetime, timedelta
+from os import listdir
+from openpyxl import load_workbook
+
+today=datetime.now(pytz.timezone('Asia/Shanghai'))
+
+############remove when running officially 
+today=today.date()
+# today=today.date()-timedelta(days=8)
+#today=today.date()
+today=today.strftime('%Y%m%d')
+
+all_PM_expiryblotter_file_path=r"\\paghk.local\shares\Enfusion\Polymer\\"+today
+firm_positions_list_dir=listdir(all_PM_expiryblotter_file_path)
+
+firm_positions_list_dir1 = firm_positions_list_dir[::-1]
+
+for file_name in firm_positions_list_dir1:
+    
+    
+    if "Expiry_Report" in file_name:
+        print(file_name)
+
+        all_PM_expiryblotter_file_path=all_PM_expiryblotter_file_path+"\\"+file_name
+        break
+
+#Trade_Blotter_Data_allPM=pd.read_csv(all_PM_tradeblotter_file_path)
+#load EOD blotter
+Expiry_Blotter_Data_allPM=pd.read_csv(all_PM_expiryblotter_file_path,engine='python')
+Expiry_Blotter_Data_allPM.to_excel(r"T:\Daily trades\Daily Re\Python_Trade_Blotter\Expiry report\Expiry.xlsx",index=False)
+#open loader
+# wb = openpyxl.load_workbook('Expiry.xlsx')
+# ws = wb.active
+# rngs = list(ws.values)
+# d = {}
+# for row in rngs[1:]:
+#     if row[9] in d.keys():
+#         d[row[9]] += [row]
+#     else:
+#         d[row[9]] = [row]
+
+# nwb = openpyxl.Workbook()
+# # key is PM , Position is Item
+# for pm, position in sorted(d.items()):
+#     nws=nwb.create_sheet(pm)  # create workbook
+#     nws.append(rngs[0])
+#     for expiry in position:
+#         nws.append(expiry)
+# nwb.remove(nwb.worksheets[0])
+# nwb.save(r"T:\Daily trades\Daily Re\Python_Trade_Blotter\Expiry report\Expiry per pm.xlsx")
+pmlist=Expiry_Blotter_Data_allPM['Account Code'].unique
+
+with pd.ExcelWriter(r"T:\Daily trades\Daily Re\Python_Trade_Blotter\Expiry report\Expiry.xlsx",engine='xlsxwriter') as writer:
+  for n in pmlist():
+      Expiry_Blotter_Data_allPM[Expiry_Blotter_Data_allPM['Account Code']==n].to_excel(writer,sheet_name=n,index=None)
+      
